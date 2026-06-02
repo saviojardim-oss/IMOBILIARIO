@@ -27,7 +27,6 @@
         tr:nth-child(even) { background-color: #f8fafc; }
         tr:hover { background-color: #f1f5f9; }
 
-        /* Estilo do ícone do mapa */
         .link-maps { text-decoration: none; font-size: 14px; display: inline-block; transition: transform 0.2s; cursor: pointer; }
         .link-maps:hover { transform: scale(1.25); }
 
@@ -39,7 +38,7 @@
 
 <div class="container">
     <h1>📋 Consulta de Imóveis e Proprietários</h1>
-    <div class="dica-maps">💡 <span>Dica de Navegação:</span> O nome da rua agora é texto comum. Para abrir a localização no Google Maps, basta clicar no ícone 📍 ao lado do endereço.</div>
+    <div class="dica-maps">💡 <span>Dica de Navegação:</span> O nome da rua é texto comum. Para abrir a localização no Google Maps, basta clicar no ícone 📍 ao lado do endereço.</div>
     
     <div class="search-container">
         <input type="text" id="search-input" class="search-box" placeholder="Carregando dados, aguarde..." disabled>
@@ -60,4 +59,107 @@
                     <th>Nº</th>
                     <th>CEP</th>
                     <th>Quadra</th>
-                    <th>L
+                    <th>Lote</th>
+                    <th>Área Terr. (m²)</th>
+                    <th>Área Edif. (m²)</th>
+                    <th>Matrícula</th>
+                    <th>Endereço Entrega</th>
+                </tr>
+            </thead>
+            <tbody id="corpo-tabela">
+            </tbody>
+        </table>
+    </div>
+    <div id="status-mensagem" class="carregando">Buscando arquivo CSV...</div>
+</div>
+
+<script>
+    let dadosImoveis = [];
+
+    // Carregamento com caminho relativo padrão para o GitHub Pages
+    Papa.parse('./dados.csv', {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            dadosImoveis = results.data;
+            
+            const input = document.getElementById('search-input');
+            input.disabled = false;
+            input.placeholder = "Busque por Proprietário, CPF, Inscrição, Bairro...";
+            document.getElementById('status-mensagem').style.display = 'none';
+            
+            exibirDados(dadosImoveis.slice(0, 100), dadosImoveis.length);
+        },
+        error: function(err) {
+            console.error("Erro ao ler o CSV:", err);
+            document.getElementById('status-mensagem').innerHTML = "Erro ao carregar o arquivo CSV.<br><small>Certifique-se de que o arquivo está na mesma pasta do index.html e com o nome exatamente em minúsculo: <b>dados.csv</b></small>";
+            document.getElementById('status-mensagem').style.color = 'red';
+        }
+    });
+
+    function exibirDados(lista, totalGeral = null) {
+        const corpoTabela = document.getElementById('corpo-tabela');
+        const contador = document.getElementById('contador-resultados');
+        corpoTabela.innerHTML = "";
+        
+        let totalExibido = totalGeral !== null ? totalGeral : lista.length;
+        contador.innerText = `${totalExibido} registro(s) encontrado(s).` + (lista.length === 100 ? " (Exibindo os primeiros 100 resultados para poupar memória)" : "");
+
+        if (lista.length === 0) {
+            corpoTabela.innerHTML = `<tr><td colspan="14" class="sem-resultados">Nenhum registro encontrado para essa busca.</td></tr>`;
+            return;
+        }
+
+        lista.forEach(item => {
+            const logradouro = item['IMOVELLOGRADOURO'] || '';
+            const numero = item['NUMERO'] || '';
+            const bairro = item['BAIRRO'] || '';
+            
+            let celulaLogradouro = '-';
+            if (logradouro) {
+                const queryBusca = encodeURIComponent(`${logradouro}, ${numero} - ${bairro}, Vila Velha, ES`);
+                const urlMaps = `https://www.google.com/maps/search/?api=1&query=${queryBusca}`;
+                celulaLogradouro = `${logradouro} <a href="${urlMaps}" target="_blank" class="link-maps" title="Abrir no Google Maps">📍</a>`;
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><b>${item['PROPRIETARIO'] || '-'}</b></td>
+                <td>${item['RESPONSAVEL'] || '-'}</td>
+                <td>${item['CNPJ CPF RESPONSAVEL'] || '-'}</td>
+                <td>${item['INSCRICAO'] || '-'}</td>
+                <td>${item['BAIRRO'] || '-'}</td>
+                <td>${celulaLogradouro}</td>
+                <td>${numero || '-'}</td>
+                <td>${item['IMOVELCEP'] || '-'}</td>
+                <td>${item['QUADRA'] || '-'}</td>
+                <td>${item['LOTES'] || '-'}</td>
+                <td>${item['AREA TERRENO'] || '-'}</td>
+                <td>${item['AREA EDIFICADA'] || '-'}</td>
+                <td>${item['MATRICULA'] || '-'}</td>
+                <td>${item['ENTREGA ENDERECO'] || '-'}</td>
+            `;
+            corpoTabela.appendChild(tr);
+        });
+    }
+
+    document.getElementById('search-input').addEventListener('input', (e) => {
+        const termo = e.target.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
+        if (!termo) {
+            exibirDados(dadosImoveis.slice(0, 100), dadosImoveis.length);
+            return;
+        }
+
+        const filtrados = dadosImoveis.filter(item => {
+            const textoLinha = Object.values(item).join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return textoLinha.includes(termo);
+        });
+
+        exibirDados(filtrados.slice(0, 100), filtrados.length);
+    });
+</script>
+
+</body>
+</html>
