@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Consulta Imobiliária</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f8f9fa; margin: 0; padding: 30px 15px; color: #333; }
+        .container { max-width: 100%; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1 { color: #1e3a8a; margin-top: 0; font-size: 24px; text-align: center; margin-bottom: 6px; }
+        
+        /* Estilo da nova observação de navegação */
+        .dica-maps { text-align: center; color: #475569; font-size: 14px; margin-bottom: 25px; font-weight: 400; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .dica-maps span { color: #1e3a8a; font-weight: 600; }
+
+        .search-container { position: relative; max-width: 600px; margin: 0 auto 25px auto; }
+        .search-box { width: 100%; padding: 14px 20px; font-size: 16px; border: 2px solid #cbd5e1; border-radius: 30px; outline: none; transition: all 0.3s; }
+        .search-box:focus { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15); }
+        
+        .contador { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 15px; font-weight: 500; }
+
+        .table-responsive { overflow-x: auto; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; max-height: 600px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+        th { background-color: #1e3a8a; color: white; padding: 12px 10px; font-weight: 600; position: sticky; top: 0; z-index: 10; }
+        td { padding: 10px; border-bottom: 1px solid #e2e8f0; color: #475569; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        tr:hover { background-color: #f1f5f9; }
+
+        /* Estilo dos links do Google Maps na tabela */
+        .link-maps { color: #3b82f6; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; transition: color 0.2s; }
+        .link-maps:hover { color: #1d4ed8; text-decoration: underline; }
+
+        .sem-resultados { text-align: center; padding: 40px; color: #94a3b8; font-style: italic; }
+        .carregando { text-align: center; padding: 20px; color: #3b82f6; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📋 Consulta de Imóveis e Proprietários</h1>
+    <div class="dica-maps">💡 <span>Dica de Navegação:</span> Clique sobre o nome de qualquer logradouro para abrir a localização exata diretamente no Google Maps.</div>
+    
+    <div class="search-container">
+        <input type="text" id="search-input" class="search-box" placeholder="Carregando dados, aguarde..." disabled>
+    </div>
+    
+    <div id="contador-resultados" class="contador"></div>
+
+    <div class="table-responsive">
+        <table id="tabela-resultados">
+            <thead>
+                <tr>
+                    <th>Proprietário</th>
+                    <th>Responsável</th>
+                    <th>CNPJ/CPF Resp.</th>
+                    <th>Inscrição</th>
+                    <th>Bairro</th>
+                    <th>Logradouro</th>
+                    <th>Nº</th>
+                    <th>CEP</th>
+                    <th>Quadra</th>
+                    <th>Lote</th>
+                    <th>Área Terr. (m²)</th>
+                    <th>Área Edif. (m²)</th>
+                    <th>Matrícula</th>
+                    <th>Endereço Entrega</th>
+                </tr>
+            </thead>
+            <tbody id="corpo-tabela">
+            </tbody>
+        </table>
+    </div>
+    <div id="status-mensagem" class="carregando">Buscando arquivo CSV...</div>
+</div>
+
+<script>
+    let dadosImoveis = [];
+
+    // Lendo o arquivo simplificado 'dados.csv' usando PapaParse
+    Papa.parse('dados.csv', {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            dadosImoveis = results.data;
+            
+            const input = document.getElementById('search-input');
+            input.disabled = false;
+            input.placeholder = "Busque por Proprietário, CPF, Inscrição, Bairro...";
+            document.getElementById('status-mensagem').style.display = 'none';
+            
+            // Exibe os primeiros 100 itens para o carregamento inicial ser instantâneo
+            exibirDados(dadosImoveis.slice(0, 100), dadosImoveis.length);
+        },
+        error: function(err) {
+            console.error("Erro ao ler o CSV:", err);
+            document.getElementById('status-mensagem').innerText = "Erro ao carregar o arquivo CSV. Certifique-se de que o arquivo na pasta se chama exatamente 'dados.csv'.";
+            document.getElementById('status-mensagem').style.color = 'red';
+        }
+    });
+
+    // Função para renderizar os dados na tabela
+    function exibirDados(lista, totalGeral = null) {
+        const corpoTabela = document.getElementById('corpo-tabela');
+        const contador = document.getElementById('contador-resultados');
+        corpoTabela.innerHTML = "";
+        
+        let totalExibido = totalGeral !== null ? totalGeral : lista.length;
+        contador.innerText = `${totalExibido} registro(s) encontrado(s).` + (lista.length === 100 ? " (Exibindo os primeiros 100 resultados para poupar memória)" : "");
+
+        if (lista.length === 0) {
+            corpoTabela.innerHTML = `<tr><td colspan="14" class="sem-resultados">Nenhum registro encontrado para essa busca.</td></tr>`;
+            return;
+        }
+
+        lista.forEach(item => {
+            const logradouro = item['IMOVELLOGRADOURO'] || '';
+            const numero = item['NUMERO'] || '';
+            const bairro = item['BAIRRO'] || '';
+            
+            let linkMaps = '#';
+            let targetBlank = '';
+            
+            // Monta o link se houver rua preenchida
+            if (logradouro) {
+                const queryBusca = encodeURIComponent(`${logradouro}, ${numero} - ${bairro}, Vila Velha, ES`);
+                linkMaps = `https://www.google.com/maps/search/?api=1&query=${queryBusca}`;
+                targetBlank = 'target="_blank"';
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><b>${item['PROPRIETARIO'] || '-'}</b></td>
+                <td>${item['RESPONSAVEL'] || '-'}</td>
+                <td>${item['CNPJ CPF RESPONSAVEL'] || '-'}</td>
+                <td>${item['INSCRICAO'] || '-'}</td>
+                <td>${item['BAIRRO'] || '-'}</td>
+                <td>
+                    ${logradouro ? `<a href="${linkMaps}" ${targetBlank} class="link-maps" title="Visualizar no Google Maps">📍 ${logradouro}</a>` : '-'}
+                </td>
+                <td>${numero || '-'}</td>
+                <td>${item['IMOVELCEP'] || '-'}</td>
+                <td>${item['QUADRA'] || '-'}</td>
+                <td>${item['LOTES'] || '-'}</td>
+                <td>${item['AREA TERRENO'] || '-'}</td>
+                <td>${item['AREA EDIFICADA'] || '-'}</td>
+                <td>${item['MATRICULA'] || '-'}</td>
+                <td>${item['ENTREGA ENDERECO'] || '-'}</td>
+            `;
+            corpoTabela.appendChild(tr);
+        });
+    }
+
+    // Filtro de pesquisa rápido com remoção de acentos
+    document.getElementById('search-input').addEventListener('input', (e) => {
+        const termo = e.target.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
+        if (!termo) {
+            exibirDados(dadosImoveis.slice(0, 100), dadosImoveis.length);
+            return;
+        }
+
+        const filtrados = dadosImoveis.filter(item => {
+            const textoLin
