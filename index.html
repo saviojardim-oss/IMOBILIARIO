@@ -27,8 +27,9 @@
         tr:nth-child(even) { background-color: #f8fafc; }
         tr:hover { background-color: #f1f5f9; }
 
-        .link-maps { color: #3b82f6; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; transition: color 0.2s; }
-        .link-maps:hover { color: #1d4ed8; text-decoration: underline; }
+        /* Estilo do ícone do mapa */
+        .link-maps { text-decoration: none; font-size: 14px; display: inline-block; transition: transform 0.2s; cursor: pointer; }
+        .link-maps:hover { transform: scale(1.25); }
 
         .sem-resultados { text-align: center; padding: 40px; color: #94a3b8; font-style: italic; }
         .carregando { text-align: center; padding: 20px; color: #3b82f6; font-weight: bold; }
@@ -38,7 +39,7 @@
 
 <div class="container">
     <h1>📋 Consulta de Imóveis e Proprietários</h1>
-    <div class="dica-maps">💡 <span>Dica de Navegação:</span> Clique sobre o nome de qualquer logradouro para abrir a localização exata diretamente no Google Maps.</div>
+    <div class="dica-maps">💡 <span>Dica de Navegação:</span> O nome da rua agora é texto comum. Para abrir a localização no Google Maps, basta clicar no ícone 📍 ao lado do endereço.</div>
     
     <div class="search-container">
         <input type="text" id="search-input" class="search-box" placeholder="Carregando dados, aguarde..." disabled>
@@ -59,114 +60,4 @@
                     <th>Nº</th>
                     <th>CEP</th>
                     <th>Quadra</th>
-                    <th>Lote</th>
-                    <th>Área Terr. (m²)</th>
-                    <th>Área Edif. (m²)</th>
-                    <th>Matrícula</th>
-                    <th>Endereço Entrega</th>
-                </tr>
-            </thead>
-            <tbody id="corpo-tabela">
-            </tbody>
-        </table>
-    </div>
-    <div id="status-mensagem" class="carregando">Buscando arquivo CSV...</div>
-</div>
-
-<script>
-    let dadosImoveis = [];
-
-    // Usando caminho absoluto relativo para evitar problemas de rota no GitHub Pages
-    const urlCSV = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) + '/dados.csv';
-
-    Papa.parse(urlCSV, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: function(results) {
-            dadosImoveis = results.data;
-            
-            const input = document.getElementById('search-input');
-            input.disabled = false;
-            input.placeholder = "Busque por Proprietário, CPF, Inscrição, Bairro...";
-            document.getElementById('status-mensagem').style.display = 'none';
-            
-            exibirDados(dadosImoveis.slice(0, 100), dadosImoveis.length);
-        },
-        error: function(err) {
-            console.error("Erro ao ler o CSV:", err);
-            document.getElementById('status-mensagem').innerHTML = "Erro ao carregar o arquivo CSV.<br><small>Certifique-se de que o arquivo está na mesma pasta do index.html e com o nome exatamente em minúsculo: <b>dados.csv</b></small>";
-            document.getElementById('status-mensagem').style.color = 'red';
-        }
-    });
-
-    function exibirDados(lista, totalGeral = null) {
-        const corpoTabela = document.getElementById('corpo-tabela');
-        const contador = document.getElementById('contador-resultados');
-        corpoTabela.innerHTML = "";
-        
-        let totalExibido = totalGeral !== null ? totalGeral : lista.length;
-        contador.innerText = `${totalExibido} registro(s) encontrado(s).` + (lista.length === 100 ? " (Exibindo os primeiros 100 resultados para poupar memória)" : "");
-
-        if (lista.length === 0) {
-            corpoTabela.innerHTML = `<tr><td colspan="14" class="sem-resultados">Nenhum registro encontrado para essa busca.</td></tr>`;
-            return;
-        }
-
-        lista.forEach(item => {
-            const logradouro = item['IMOVELLOGRADOURO'] || '';
-            const numero = item['NUMERO'] || '';
-            const bairro = item['BAIRRO'] || '';
-            
-            let linkMaps = '#';
-            let targetBlank = '';
-            
-            if (logradouro) {
-                // Monta o termo de busca limpo focado na sua cidade base
-                const queryBusca = encodeURIComponent(`${logradouro}, ${numero} - ${bairro}, Vila Velha, ES`);
-                linkMaps = `https://www.google.com/maps/search/?api=1&query=${queryBusca}`;
-                targetBlank = 'target="_blank"';
-            }
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><b>${item['PROPRIETARIO'] || '-'}</b></td>
-                <td>${item['RESPONSAVEL'] || '-'}</td>
-                <td>${item['CNPJ CPF RESPONSAVEL'] || '-'}</td>
-                <td>${item['INSCRICAO'] || '-'}</td>
-                <td>${item['BAIRRO'] || '-'}</td>
-                <td>
-                    ${logradouro ? `<a href="${linkMaps}" ${targetBlank} class="link-maps" title="Visualizar no Google Maps">📍 ${logradouro}</a>` : '-'}
-                </td>
-                <td>${numero || '-'}</td>
-                <td>${item['IMOVELCEP'] || '-'}</td>
-                <td>${item['QUADRA'] || '-'}</td>
-                <td>${item['LOTES'] || '-'}</td>
-                <td>${item['AREA TERRENO'] || '-'}</td>
-                <td>${item['AREA EDIFICADA'] || '-'}</td>
-                <td>${item['MATRICULA'] || '-'}</td>
-                <td>${item['ENTREGA ENDERECO'] || '-'}</td>
-            `;
-            corpoTabela.appendChild(tr);
-        });
-    }
-
-    document.getElementById('search-input').addEventListener('input', (e) => {
-        const termo = e.target.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        
-        if (!termo) {
-            exibirDados(dadosImoveis.slice(0, 100), dadosImoveis.length);
-            return;
-        }
-
-        const filtrados = dadosImoveis.filter(item => {
-            const textoLinha = Object.values(item).join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            return textoLinha.includes(termo);
-        });
-
-        exibirDados(filtrados.slice(0, 100), filtrados.length);
-    });
-</script>
-
-</body>
-</html>
+                    <th>L
