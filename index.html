@@ -11,7 +11,6 @@
         .container { max-width: 100%; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         h1 { color: #1e3a8a; margin-top: 0; font-size: 24px; text-align: center; margin-bottom: 6px; }
         
-        /* Estilo da nova observação de navegação */
         .dica-maps { text-align: center; color: #475569; font-size: 14px; margin-bottom: 25px; font-weight: 400; display: flex; align-items: center; justify-content: center; gap: 6px; }
         .dica-maps span { color: #1e3a8a; font-weight: 600; }
 
@@ -28,7 +27,6 @@
         tr:nth-child(even) { background-color: #f8fafc; }
         tr:hover { background-color: #f1f5f9; }
 
-        /* Estilo dos links do Google Maps na tabela */
         .link-maps { color: #3b82f6; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; transition: color 0.2s; }
         .link-maps:hover { color: #1d4ed8; text-decoration: underline; }
 
@@ -78,8 +76,10 @@
 <script>
     let dadosImoveis = [];
 
-    // Lendo o arquivo simplificado 'dados.csv' usando PapaParse
-    Papa.parse('dados.csv', {
+    // Usando caminho absoluto relativo para evitar problemas de rota no GitHub Pages
+    const urlCSV = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/')) + '/dados.csv';
+
+    Papa.parse(urlCSV, {
         download: true,
         header: true,
         skipEmptyLines: true,
@@ -91,17 +91,15 @@
             input.placeholder = "Busque por Proprietário, CPF, Inscrição, Bairro...";
             document.getElementById('status-mensagem').style.display = 'none';
             
-            // Exibe os primeiros 100 itens para o carregamento inicial ser instantâneo
             exibirDados(dadosImoveis.slice(0, 100), dadosImoveis.length);
         },
         error: function(err) {
             console.error("Erro ao ler o CSV:", err);
-            document.getElementById('status-mensagem').innerText = "Erro ao carregar o arquivo CSV. Certifique-se de que o arquivo na pasta se chama exatamente 'dados.csv'.";
+            document.getElementById('status-mensagem').innerHTML = "Erro ao carregar o arquivo CSV.<br><small>Certifique-se de que o arquivo está na mesma pasta do index.html e com o nome exatamente em minúsculo: <b>dados.csv</b></small>";
             document.getElementById('status-mensagem').style.color = 'red';
         }
     });
 
-    // Função para renderizar os dados na tabela
     function exibirDados(lista, totalGeral = null) {
         const corpoTabela = document.getElementById('corpo-tabela');
         const contador = document.getElementById('contador-resultados');
@@ -123,8 +121,8 @@
             let linkMaps = '#';
             let targetBlank = '';
             
-            // Monta o link se houver rua preenchida
             if (logradouro) {
+                // Monta o termo de busca limpo focado na sua cidade base
                 const queryBusca = encodeURIComponent(`${logradouro}, ${numero} - ${bairro}, Vila Velha, ES`);
                 linkMaps = `https://www.google.com/maps/search/?api=1&query=${queryBusca}`;
                 targetBlank = 'target="_blank"';
@@ -153,7 +151,6 @@
         });
     }
 
-    // Filtro de pesquisa rápido com remoção de acentos
     document.getElementById('search-input').addEventListener('input', (e) => {
         const termo = e.target.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         
@@ -163,4 +160,13 @@
         }
 
         const filtrados = dadosImoveis.filter(item => {
-            const textoLin
+            const textoLinha = Object.values(item).join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return textoLinha.includes(termo);
+        });
+
+        exibirDados(filtrados.slice(0, 100), filtrados.length);
+    });
+</script>
+
+</body>
+</html>
